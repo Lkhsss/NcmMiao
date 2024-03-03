@@ -4,13 +4,11 @@ use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
 use aes::Aes128;
 use base64;
 use colored::*;
-use core::panic;
 use log::{debug, error, info, trace, warn};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::fs::{self, File};
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom, Write};
-// use std::iter::Enumerate;
 use std::path::Path;
 use std::str::from_utf8;
 
@@ -500,8 +498,8 @@ fn aes128_to_slice(key: &[u8], blocks: &[u8]) -> Vec<u8> {
 fn standardize_filename(old_filename: String) -> String {
     let mut new_filename = String::from(old_filename);
     debug!("规范文件名：{}", new_filename);
-    let standard =   ["\\", "/", "*", "?", "\"", ":", "<", ">", "|"];
-    let resolution = ["_", "_", "＊", "？", "＂", "：", "⟨", "⟩", "_",];
+    let standard = ["\\", "/", "*", "?", "\"", ":", "<", ">", "|"];
+    let resolution = ["_", "_", "＊", "？", "＂", "：", "⟨", "⟩", "_"];
     for i in 0..standard.len() {
         new_filename = new_filename.replace(&standard[i].to_string(), &resolution[i].to_string());
     }

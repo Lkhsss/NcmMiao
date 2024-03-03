@@ -1,6 +1,6 @@
 use env_logger::Builder;
 use hex::decode;
-use log::{error, warn};
+use log::{error, info, warn};
 use ncmmiao::{dump, Key, Ncmfile};
 use std::env;
 use std::path::Path;
@@ -76,17 +76,10 @@ fn main() {
         }
     }
     // let filepaths = undumpfile;
-    let count = undumpfile.len();
-    let mut time = 0usize;
+    // let count = undumpfile.len();
+    // let mut time = 0usize;
     for filepath in undumpfile {
-        time += 1;
-        // println!("{}/{}", &time, &count);
         let mut ncmfile = Ncmfile::new(&filepath).unwrap();
         dump(&mut ncmfile, &keys, Path::new("output")).unwrap();
-
-        //TODO增加计时
-        // let time = SystemTime::now();
-        // let time = SystemTime::now().duration_since(time).unwrap().as_secs();
-        // println!("{}",time);
     }
 }
