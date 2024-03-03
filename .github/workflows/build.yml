@@ -51,14 +51,17 @@ jobs:
         shell: bash
         run: |
           mkdir archive
-          cp LICENSE README.md archive/
+          # cp LICENSE README.md archive/
+          cp README.md archive/
           cd archive
           if [ "${{ matrix.build }}" = "windows" ]; then
             cp "../target/${{ matrix.target }}/release/ncmmiao.exe" ./
-            7z a "${{ matrix.archive-name }}" LICENSE README.md ncmmiao.exe
+            # 7z a "${{ matrix.archive-name }}" LICENSE README.md ncmmiao.exe
+            7z a "${{ matrix.archive-name }}" README.md ncmmiao.exe
           else
             cp "../target/${{ matrix.target }}/release/ncmmiao" ./
-            tar -czf "${{ matrix.archive-name }}" LICENSE README.md ncmmiao
+            # tar -czf "${{ matrix.archive-name }}" LICENSE README.md ncmmiao
+            tar -czf "${{ matrix.archive-name }}" README.md ncmmiao
           fi
       - name: Upload archive
         uses: actions/upload-artifact@v1
