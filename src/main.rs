@@ -1,19 +1,26 @@
 use env_logger::Builder;
 use hex::decode;
 use log::{error, info, warn};
-use ncmmiao::{dump, Key, Ncmfile};
+
 use std::env;
 use std::path::Path;
 // use std::time::SystemTime;
-use walkdir::WalkDir;
-#[warn(unreachable_code)]
+use walkdir::WalkDir; //遍历目录
+
+mod ncmdump;
+mod threadpool;
+use ncmdump::{dump, Key, Ncmfile};
+mod test;
 
 fn main() {
+    // 最大线程数
+    let max_workers = 4;
+
     let mut builder = Builder::new();
     builder.filter(None, log::LevelFilter::Info);
     builder.init(); //初始化logger
 
-    let keys = Key {
+    let keys: Key = Key {
         core: decode("687A4852416D736F356B496E62617857").unwrap(),
         meta: decode("2331346C6A6B5F215C5D2630553C2728").unwrap(),
     };
@@ -21,6 +28,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let args = if args.len() == 1 {
         warn!("未指定文件夹，将使用默认文件夹。");
+
         let mut args_temp = Vec::new();
         if Path::new("CloudMusic").exists() {
             warn!("CloudMusic文件夹存在，将自动使用。");
@@ -39,7 +47,6 @@ fn main() {
     } else {
         args[1..].to_vec()
     };
-    // let args = &args[1..];
 
     let mut undumpfile = Vec::new(); // 该列表将存入文件的路径
 
@@ -78,8 +85,14 @@ fn main() {
     // let filepaths = undumpfile;
     // let count = undumpfile.len();
     // let mut time = 0usize;
+
+    // 初始化线程池
+    let pool = threadpool::Pool::new(max_workers);
     for filepath in undumpfile {
-        let mut ncmfile = Ncmfile::new(&filepath).unwrap();
-        dump(&mut ncmfile, &keys, Path::new("output")).unwrap();
+        let tkey = keys.clone();
+        pool.execute(move || {
+            let mut ncmfile = Ncmfile::new(filepath.as_str()).unwrap();
+            dump(&mut ncmfile, &tkey, Path::new("output")).unwrap();
+        });
     }
 }

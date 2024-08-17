@@ -16,9 +16,9 @@ use std::str::from_utf8;
 pub struct Ncmfile {
     /// 文件对象
     pub file: File,
-    /// 只是名称，不带后缀
+    /// 歌曲名称，不带文件后缀
     pub name: String,
-    /// 带后缀名
+    /// 文件名称，带后缀名
     pub filename: String,
     /// 文件大小
     pub size: u64,
@@ -182,6 +182,7 @@ struct Metadata {
 }
 
 // 存储各种密钥的结构体
+#[derive(Clone)]
 pub struct Key {
     pub core: Vec<u8>,
     pub meta: Vec<u8>,
@@ -257,7 +258,7 @@ pub fn dump(ncmfile: &mut Ncmfile, keys: &Key, outputdir: &Path) -> Result<(), M
     };
 
     // 跳过4个字节的校验码
-    trace!("跳过4个字节的校验码");
+    trace!("读取校验码");
     let crc32 = u32::from_le_bytes(ncmfile.seekread(4).unwrap().try_into().unwrap()) as u64;
 
     // 跳过5个字节
@@ -278,7 +279,7 @@ pub fn dump(ncmfile: &mut Ncmfile, keys: &Key, outputdir: &Path) -> Result<(), M
     // trace!("保存图片");
     // let mut file = File::create(format!("TEST.jpg",)).unwrap();
     // file.write_all(&image_data).unwrap();
-
+    trace!("组成密码盒");
     let key_box = {
         let key_length = key_data.len();
         let key_data = Vec::from(key_data);
@@ -430,6 +431,7 @@ pub fn dump(ncmfile: &mut Ncmfile, keys: &Key, outputdir: &Path) -> Result<(), M
 }
 
 // fn read_meta(file: &mut File, meta_length: u32) -> Result<Vec<u8>, Error> {}
+
 fn convert_to_generic_arrays(input: &[u8]) -> Vec<GenericArray<u8, U16>> {
     // 确保输入的长度是16的倍数
     assert!(
@@ -470,6 +472,8 @@ fn aes128(key: &[u8], blocks: &[u8]) -> String {
 
     x.to_string()
 }
+
+/// ## AES128解密
 fn aes128_to_slice(key: &[u8], blocks: &[u8]) -> Vec<u8> {
     trace!("进行AES128解密");
     let key = GenericArray::from_slice(key);
@@ -481,6 +485,8 @@ fn aes128_to_slice(key: &[u8], blocks: &[u8]) -> Vec<u8> {
 
     // 开始解密
     cipher.decrypt_blocks(&mut blocks);
+
+    //取出解密后的值
     let mut x: Vec<u8> = Vec::new();
     for block in blocks.iter() {
         for i in block {
@@ -496,8 +502,9 @@ fn aes128_to_slice(key: &[u8], blocks: &[u8]) -> Vec<u8> {
 /// -  \  /  *  ?  "  :   <  >  |
 /// -  _  _  ＊  ？ ＂  ：  ⟨  ⟩   _
 fn standardize_filename(old_filename: String) -> String {
+    trace!("格式化文件名");
     let mut new_filename = String::from(old_filename);
-    debug!("规范文件名：{}", new_filename);
+    // debug!("规范文件名：{}", new_filename);
     let standard = ["\\", "/", "*", "?", "\"", ":", "<", ">", "|"];
     let resolution = ["_", "_", "＊", "？", "＂", "：", "⟨", "⟩", "_"];
     for i in 0..standard.len() {
