@@ -1,4 +1,6 @@
 # NcmMiao :tada:
+[![build](https://github.com/Lkhsss/NcmMiao/actions/workflows/build.yml/badge.svg?event=push)](https://github.com/Lkhsss/NcmMiao/actions/workflows/build.yml)
+
 一个使用Rust语言编写的ncm文件解密工具。
 
 ### 功能及特点
