@@ -1,13 +1,14 @@
 # NcmMiao :tada:
 [![build](https://github.com/Lkhsss/NcmMiao/actions/workflows/build.yml/badge.svg?event=push)](https://github.com/Lkhsss/NcmMiao/actions/workflows/build.yml)
 
-一个使用Rust语言编写的ncm文件解密工具。
+一个使用Rust语言编写的ncm文件解密工具（第一！😆）。
 
 ### 功能及特点
  - 支持单一文件，多文件夹递归批量解密。
  - 完善的日志功能
  - Colorful
  - 编译文件小，解密快
+ - [New!]支持自动添加封面！
 
 ## 编译
 ```
@@ -17,20 +18,25 @@ cargo build -r
 ## 使用
 支持单一文件，多文件夹递归批量解密。
 ```
-cargo run -r <文件或文件夹路径1> <文件或文件夹路径2> <文件或文件夹路径3> ... 
+ncmmiao [OPTIONS]
+Options:
+  -w, --workers <WORKERS>  最大线程数 约束逻辑在主函数
+  -i, --input <输入文件/文件夹>   需要解密的文件夹或文件
+  -o, --output <输出文件夹>     [默认: NcmmiaoOutput]
 ```
-> 注意！如果没有指定任何文件夹或者文件，那么程序将自动读取工作目录下的CloudMusic和input文件夹下的文件。如果都没有将自动退出。
 
-输出文件夹在output。等我想写了再写命令行解析（bushi。
+~~输出文件夹在output。等我想写了再写命令行解析（bushi。~~ 写了写了
 
 ---
 
 # TODO :construction:
  - [x] 多线程支持
+ - [x] 自动添加封面
  - [ ] 解密进度条
- - [ ] 命令行解析
- - [ ] 自定义输出文件夹
- - [ ] 计时功能
+ - [x] 命令行解析
+ - [x] 自定义输出文件夹
+ - [x] 计时功能
+ - [ ] 自动覆盖开关
 
 ---
 
@@ -55,10 +61,21 @@ cargo run -r <文件或文件夹路径1> <文件或文件夹路径2> <文件或�
 ## [1.1.4] - 2024-7-14
 ### Features :sparkles:
 - 增加多线程支持！
-  > 目前固定4线程，还没写命令行参数。可以源代码修改线程数
+  > ~~目前固定4线程，还没写命令行参数。可以源代码修改线程数~~ 已于2.1.4版本修复~
 ### Fixed
 - 优化代码结构
 
+## [2.2.4] - 2024-11-17
+### Features :sparkles:
+- :ambulance:完整的多线程支持！可自定线程数！
+- :ambulance:自动添加封面，解密文件不再需要musictag!
+- :sparkles: 完整的命令行参数支持！
+- :sparkles: 计时功能！
+### Fixed
+- :arrow_up: 升级依赖
+- 优化保存文件逻辑，保存时间缩短到毫秒
+### Refactoring
+- :hammer: 重构代码！
 ---
 
 # 附 - ncm文件结构

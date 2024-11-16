@@ -1,58 +1,45 @@
-use env_logger::Builder;
-use hex::decode;
+use ::clap::Parser;
+#[allow(unused_imports)]
 use log::{error, info, warn};
 
-use std::env;
 use std::path::Path;
-// use std::time::SystemTime;
 use walkdir::WalkDir; //遍历目录
 
+mod clap;
+mod logger;
 mod ncmdump;
 mod threadpool;
-use ncmdump::{dump, Key, Ncmfile};
+use ncmdump::Ncmfile;
 mod test;
 
 fn main() {
+    let timer = ncmdump::TimeCompare::new();
+    // 初始化日志系统
+    logger::Logger::new();
+
+    let cli = clap::Cli::parse();
+
     // 最大线程数
-    let max_workers = 4;
-
-    let mut builder = Builder::new();
-    builder.filter(None, log::LevelFilter::Info);
-    builder.init(); //初始化logger
-
-    let keys: Key = Key {
-        core: decode("687A4852416D736F356B496E62617857").unwrap(),
-        meta: decode("2331346C6A6B5F215C5D2630553C2728").unwrap(),
-    };
-
-    let args: Vec<String> = env::args().collect();
-    let args = if args.len() == 1 {
-        warn!("未指定文件夹，将使用默认文件夹。");
-
-        let mut args_temp = Vec::new();
-        if Path::new("CloudMusic").exists() {
-            warn!("CloudMusic文件夹存在，将自动使用。");
-            args_temp.push(String::from("CloudMusic"));
-        };
-        if Path::new("input").exists() {
-            warn!("input文件夹存在，将自动使用。");
-            args_temp.push(String::from("input"));
-        };
-        if args_temp.is_empty() {
-            //TODO 增加软件介绍
-            error!("没有参数\n没有CloudMusic或者input文件夹存在与于工作目录");
-            panic!("没有参数\n没有CloudMusic或者input文件夹存在与于工作目录");
+    let max_workers = match cli.workers {
+        Some(n) => {
+            if n >= 1 {
+                n
+            } else {
+                1
+            }
         }
-        args_temp
-    } else {
-        args[1..].to_vec()
+        None => 4,
     };
+
+    let input = cli.input;
+
+    let outputdir = cli.output.unwrap();
 
     let mut undumpfile = Vec::new(); // 该列表将存入文件的路径
 
-    for arg in &args {
+    for arg in input {
         //解析传入的每一个路径：文件or文件夹
-        let path = Path::new(arg);
+        let path = Path::new(&arg);
 
         if path.is_file() {
             // 当后缀符合为ncm时才加入列表
@@ -82,17 +69,27 @@ fn main() {
             }
         }
     }
-    // let filepaths = undumpfile;
-    // let count = undumpfile.len();
-    // let mut time = 0usize;
+    let taskcount = undumpfile.len();
+    if taskcount == 0 {
+        error!("没有找到有效文件")
+    } else {
+        // 初始化线程池
+        let pool = threadpool::Pool::new(max_workers);
 
-    // 初始化线程池
-    let pool = threadpool::Pool::new(max_workers);
-    for filepath in undumpfile {
-        let tkey = keys.clone();
-        pool.execute(move || {
-            let mut ncmfile = Ncmfile::new(filepath.as_str()).unwrap();
-            dump(&mut ncmfile, &tkey, Path::new("output")).unwrap();
-        });
+        for filepath in undumpfile {
+            let output = outputdir.clone();
+            pool.execute(move || {
+                Ncmfile::new(filepath.as_str())
+                    .unwrap()
+                    .dump(Path::new(&output))
+                    .unwrap();
+            });
+        }
+    }
+    let timecount = timer.compare();
+    if timecount > 2000 {
+        info!("解密{}个文件，共计用时{}秒", taskcount, timecount / 1000)
+    } else {
+        info!("解密{}个文件，共计用时{}毫秒", taskcount, timecount)
     }
 }

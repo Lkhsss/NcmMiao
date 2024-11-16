@@ -1,18 +1,21 @@
 [package]
 name = "ncmmiao"
-version = "1.1.3"
+version = "2.2.4"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 aes = "0.8.3"
+audiotags = "0.5.0"
 base64 = "0.22.*"
+chrono = "0.4.38"
 clap = { version = "4.5.9", features = ["derive"] }
 colored = "2.1.0"
 env_logger = "0.11.1"
 hex = "0.4.3"
 image = "0.25.*"
+lazy_static = "1.5.0"
 log = "0.4.20"
 serde = { version = "1.0.195", features = ["derive"] }
 serde_derive = "1.0.195"
@@ -21,3 +24,11 @@ walkdir = "2.4.0"
 
 [badges]
 maintenance = { status = "actively-developed" }
+
+[profile.release]
+#缩小编译后体积
+strip = true
+# strip = "debuginfo" #仅移除debug信息
+lto = true #启用链接时间优化
+panic = "abort" #panic时直接abort
+opt-level = "z" #优化级别

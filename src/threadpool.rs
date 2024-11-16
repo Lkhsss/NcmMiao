@@ -1,7 +1,6 @@
+use log::debug;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use log::{info,debug};
-use serde::de;
 
 type Job = Box<dyn FnOnce() + 'static + Send>;
 enum Message {
@@ -47,8 +46,8 @@ impl Pool {
     pub fn new(max_workers: usize) -> Pool {
         if max_workers == 0 {
             panic!("最大线程数不能小于零！")
-        }else {
-            debug!("将开启{}线程",max_workers);
+        } else {
+            debug!("将开启{}线程", max_workers);
         }
         let (tx, rx) = mpsc::channel();
 
@@ -86,5 +85,3 @@ impl Drop for Pool {
         }
     }
 }
-
-
