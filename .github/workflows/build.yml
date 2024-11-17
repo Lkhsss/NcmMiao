@@ -75,3 +75,4 @@ jobs:
         with:
           # name: ${{ matrix.archive-name }}
           files: archive/${{ matrix.archive-name }}
+          token: ${{ secrets.TOKEN }}
