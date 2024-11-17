@@ -41,6 +41,8 @@ jobs:
           override: true
           components: rustfmt, clippy
           target: ${{ matrix.target }}
+      - name: Test
+        run: cargo test
 
       - name: Build binary
         run: cargo build --verbose --release --target ${{ matrix.target }}
