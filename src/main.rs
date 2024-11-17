@@ -71,10 +71,11 @@ fn main() {
     }
     let taskcount = undumpfile.len();
     if taskcount == 0 {
-        error!("没有找到有效文件")
+        error!("没有找到有效文件。使用-i参数输入需要解密的文件或文件夹。")
     } else {
         // 初始化线程池
         let pool = threadpool::Pool::new(max_workers);
+        info!("启用{}线程",max_workers);
 
         for filepath in undumpfile {
             let output = outputdir.clone();
