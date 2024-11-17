@@ -19,7 +19,6 @@ jobs:
         include:
         - target: aarch64-unknown-linux-musl
           os: ubuntu-latest
-          use-cross: true
           cargo-flags: ""
         - target: aarch64-apple-darwin
           os: macos-latest
