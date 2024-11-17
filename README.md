@@ -76,6 +76,9 @@ Options:
 - 优化保存文件逻辑，保存时间缩短到毫秒
 ### Refactoring
 - :hammer: 重构代码！
+## [2.2.4] - 2024-11-17
+### Features :sparkles:
+- 完整的自动构建流程！
 ---
 
 # 附 - ncm文件结构
