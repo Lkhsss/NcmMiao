@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Lkhsss <lkhsss1019@gmail.com>"]
 description = "A magic tool convert ncm to flac"
 repository = "https://github.com/lkhsss/ncmmiao"
-license = "GPL"
+license = "GPL-3.0-or-later"
 keys = ["ncm","flac","neteasemusic"]
 
 
