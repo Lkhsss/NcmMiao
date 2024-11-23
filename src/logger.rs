@@ -32,7 +32,7 @@ impl Logger {
                     }
                     log::Level::Debug => {
                         let style = buf.default_level_style(log::Level::Debug);
-                        format!("{style}Warn{style:#}")
+                        format!("{style}Debug{style:#}")
                     }
                     log::Level::Trace => {
                         let style = buf.default_level_style(log::Level::Trace);

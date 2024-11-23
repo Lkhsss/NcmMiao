@@ -11,7 +11,7 @@ use log::{debug, error, info, trace, warn};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
 use std::vec;
@@ -39,14 +39,17 @@ pub struct Ncmfile {
     pub position: u64,
 }
 impl Ncmfile {
-    pub fn new(filepath: &str) -> Result<Ncmfile, Error> {
-        let file = File::open(filepath)?;
+    pub fn new(filepath: &str) -> Result<Ncmfile, NcmError> {
+        let file = match File::open(filepath) {
+            Ok(f) => f,
+            Err(_) => return Err(NcmError::FileReadError),
+        };
         let path = Path::new(filepath);
         let fullfilename = path.file_name().unwrap().to_str().unwrap().to_string();
         let size = file.metadata().unwrap().len();
         let filename = match Path::new(&filepath).file_stem() {
             Some(f) => f.to_str().unwrap().to_string(),
-            None => panic!("获取文件名失败"),
+            None => return Err(NcmError::CannotReadFileName),
         };
         Ok(Ncmfile {
             file,
@@ -60,17 +63,14 @@ impl Ncmfile {
     ///
     /// 该函数可以记录上次读取的位置，下次读取时从上次读取的位置开始
     /// - length 想要读取的长度
-    pub fn seekread(&mut self, length: u64) -> Result<Vec<u8>, std::io::Error> {
+    pub fn seekread(&mut self, length: u64) -> Result<Vec<u8>, NcmError> {
         if self.position + length > self.size {
-            return Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                "无法读取！读取长度大于剩余文件大小！",
-            ));
+            return Err(NcmError::FileReadError);
         } else {
             let mut reader = BufReader::new(&self.file);
-            reader.seek(SeekFrom::Start(self.position))?;
+            let _ = reader.seek(SeekFrom::Start(self.position));
             let mut buf = vec![0; length as usize];
-            reader.read_exact(&mut buf)?;
+            let _ = reader.read_exact(&mut buf);
             self.position += length;
             Ok(buf[..].to_vec())
         }
@@ -82,17 +82,14 @@ impl Ncmfile {
     /// - offset 开始位置
     /// - length 想要读取的长度
     #[allow(dead_code)]
-    pub fn seekread_from(&mut self, offset: u64, length: u64) -> Result<Vec<u8>, std::io::Error> {
+    pub fn seekread_from(&mut self, offset: u64, length: u64) -> Result<Vec<u8>, NcmError> {
         if self.position + length > self.size {
-            return Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                "无法读取！读取长度大于剩余文件大小！",
-            ));
+            return Err(NcmError::FileReadError);
         } else {
             let mut reader = BufReader::new(&self.file);
-            reader.seek(SeekFrom::Start(offset))?;
+            let _ = reader.seek(SeekFrom::Start(offset));
             let mut buf = vec![0; length as usize];
-            reader.read_exact(&mut buf)?;
+            let _ = reader.read_exact(&mut buf);
             self.position = offset + length;
             Ok(buf[..].to_vec())
         }
@@ -129,12 +126,9 @@ impl Ncmfile {
         }
     }
     /// 跳过某些数据
-    pub fn skip(&mut self, length: u64) -> Result<(), std::io::Error> {
+    pub fn skip(&mut self, length: u64) -> Result<(), NcmError> {
         if self.position + length > self.size {
-            return Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                "无法跳过！跳过长度大于剩余文件大小！",
-            ));
+            return Err(NcmError::FileReadError);
         } else {
             self.position += length;
             Ok(())
@@ -150,14 +144,13 @@ impl Ncmfile {
 
     /// 解密函数
     #[allow(unused_assignments)]
-    pub fn dump(&mut self, outputdir: &Path) -> Result<(), MyError> {
+    pub fn dump(&mut self, outputdir: &Path) -> Result<(), NcmError> {
         info!("开始解密[{}]文件", self.fullfilename.yellow());
         // 获取magic header 。应为CTENFDAM
         let magic_header = match self.seekread(8) {
             Ok(header) => header,
             Err(_e) => {
-                error!("读取magic header失败");
-                return Err(MyError::MagicHeaderError);
+                return Err(NcmError::FileReadError);
             }
         };
 
@@ -166,27 +159,21 @@ impl Ncmfile {
             Ok(header) => {
                 if header != "CTENFDAM" {
                     // 传播错误至dump
-                    return Err(MyError::MagicHeaderError);
-                } else {
-                    trace!("[{}]为ncm格式文件", self.fullfilename.yellow());
-                    debug!("magic header: {}", header);
+                    return Err(NcmError::NotNcmFile);
                 }
             }
             // 传播错误至dump
-            Err(_e) => return Err(MyError::MagicHeaderError),
+            Err(_e) => return Err(NcmError::NotNcmFile),
         }
 
         // 跳过2字节
         trace!("跳过2字节");
-        match self.skip(2) {
-            Ok(_) => (),
-            Err(_e) => return Err(MyError::FileSkipError),
-        };
+        self.skip(2)?;
 
         trace!("获取RC4密钥长度");
         //小端模式读取RC4密钥长度 正常情况下应为128
         let key_length = u32::from_le_bytes(self.seekread(4).unwrap().try_into().unwrap()) as u64;
-        debug!("RC4密钥长度为：{}", key_length);
+        // debug!("RC4密钥长度为：{}", key_length);
 
         //读取密钥 开头应为 neteasecloudmusic
         trace!("读取RC4密钥");
@@ -194,55 +181,58 @@ impl Ncmfile {
         //aes128解密
         let key_data = &aes128_to_slice(&KEY_CORE, Self::parse_key(&mut key_data[..])); //先把密钥按照字节进行0x64异或
                                                                                         // RC4密钥
-        let key_data = unpad(&key_data[..])[17..].to_vec();
+        let key_data = unpad(&key_data[..])[17..].to_vec(); //去掉neteasecloudmusic
 
         //读取meta信息的数据大小
         trace!("获取meta信息数据大小");
-        let meta_length = u32::from_le_bytes(self.seekread(4).unwrap().try_into().unwrap()) as u64;
+        let meta_length = u32::from_le_bytes(self.seekread(4)?.try_into().unwrap()) as u64;
 
         // 读取meta信息
         trace!("读取meta信息");
         let meta_data = {
-            let mut meta_data = self.seekread(meta_length).unwrap(); //读取源数据
-                                                                     //字节对0x63进行异或。
+            let mut meta_data = self.seekread(meta_length)?; //读取源数据
+                                                             //字节对0x63进行异或。
             for i in 0..meta_data.len() {
                 meta_data[i] ^= 0x63;
             }
             // base64解密
             let mut decode_data = Vec::<u8>::new();
-            let _ = &base64::engine::general_purpose::STANDARD
+            let _ = match &base64::engine::general_purpose::STANDARD
                 .decode_vec(&mut meta_data[22..], &mut decode_data)
-                .unwrap();
+            {
+                Err(_) => return Err(NcmError::CannotReadMetaInfo),
+                _ => (),
+            };
             // aes128解密
             let aes_data = aes128_to_slice(&KEY_META, &decode_data);
             // unpadding
-            let json_data = String::from_utf8(unpad(&aes_data)[6..].to_vec()).unwrap();
+            let json_data = match String::from_utf8(unpad(&aes_data)[6..].to_vec()) {
+                Ok(o) => o,
+                Err(_) => return Err(NcmError::CannotReadMetaInfo),
+            };
             debug!("json_data: {}", json_data);
-            let data: Value = serde_json::from_str(&json_data[..]).unwrap(); //解析json数据
+            let data: Value = match serde_json::from_str(&json_data[..]){Ok(o) => o,
+                Err(_) => return Err(NcmError::CannotReadMetaInfo),
+            }; //解析json数据
             data
         };
 
         // 跳过4个字节的校验码
         trace!("读取校验码");
-        let _crc32 = u32::from_le_bytes(self.seekread(4).unwrap().try_into().unwrap()) as u64;
+        // let _crc32 = u32::from_le_bytes(self.seekread(4).unwrap().try_into().unwrap()) as u64;
+        self.skip(4)?;
 
         // 跳过5个字节
         trace!("跳过5个字节");
-        self.skip(5).unwrap();
+        self.skip(5)?;
 
         // 获取图片数据的大小
         trace!("获取图片数据的大小");
         let image_data_length =
-            u32::from_le_bytes(self.seekread(4).unwrap().try_into().unwrap()) as u64;
+            u32::from_le_bytes(self.seekread(4)?.try_into().unwrap()) as u64;
 
         // 读取图片，并写入文件当中
-        trace!("暂不需要保存图片,跳过{}字节", image_data_length);
-        let image_data = self.seekread(image_data_length).unwrap(); //读取图片数据
-                                                                    // let _ = self.skip(image_data_length); //暂不需要保存图片,直接跳过这些字节就好
-                                                                    //保存图片
-                                                                    // trace!("保存图片");
-                                                                    // let mut file = File::create(format!("TEST.jpg",)).unwrap();
-                                                                    // file.write_all(&image_data).unwrap();
+        let image_data = self.seekread(image_data_length)?; //读取图片数据
 
         trace!("组成密码盒");
         let key_box = {
@@ -264,7 +254,7 @@ impl Ncmfile {
                 key_box[temp as usize] = swap as u8;
                 last_byte = temp;
             }
-            let key_box = key_box.clone();
+            // let key_box = key_box.clone();
             key_box
         };
 
@@ -347,16 +337,19 @@ impl Ncmfile {
             // let filename = standardize_filename(filename);
             debug!("文件名：{}", filename.yellow());
             //链级创建输出目录
-            fs::create_dir_all(outputdir).unwrap();
+            match fs::create_dir_all(outputdir){Err(_)=>return Err(NcmError::FileWriteError),_=>()};
             outputdir.join(filename)
         };
 
         debug!("文件路径: {:?}", path);
-        self.save(&path, music_data);
+        self.save(&path, music_data)?;
 
         {
             // 保存封面
-            let mut tag = Tag::new().read_from_path(&path).unwrap();
+            let mut tag = match Tag::new().read_from_path(&path){
+                Ok(o)=>o,
+                Err(_)=>return Err(NcmError::CoverCannotSave)
+            };
             let cover = Picture {
                 mime_type: MimeType::Jpeg,
                 data: &image_data,
@@ -366,7 +359,7 @@ impl Ncmfile {
         }
 
         info!(
-            "[{}]文件已保存到: {}",
+            "[{}] 文件已保存到: {}",
             self.filename.yellow(),
             path.to_str().unwrap().bright_cyan()
         );
@@ -377,12 +370,19 @@ impl Ncmfile {
         );
         Ok(())
     }
-    fn save(&mut self, path: &PathBuf, data: Vec<u8>) {
-        let music_file = File::create(path).unwrap();
+    fn save(&mut self, path: &PathBuf, data: Vec<u8>)->Result<(),NcmError> {
+        let music_file = match File::create(path){
+            Ok(o)=>o,
+            Err(_)=>return Err(NcmError::FileWriteError)
+        };
         let mut writer = BufWriter::new(music_file);
         let _ = writer.write_all(&data);
         // 关闭文件
-        writer.flush().unwrap();
+        match writer.flush(){
+            Ok(o)=>o,
+            Err(_)=>return Err(NcmError::FileWriteError)
+        };
+        Ok(())
     }
 }
 
@@ -514,6 +514,7 @@ fn aes128_to_slice(key: &[u8], blocks: &[u8]) -> Vec<u8> {
 /// 符号一一对应：
 /// -  \  /  *  ?  "  :   <  >  |
 /// -  _  _  ＊  ？ ＂  ：  ⟨  ⟩   _
+#[allow(dead_code)]
 fn standardize_filename(old_fullfilename: String) -> String {
     trace!("格式化文件名");
     let mut new_fullfilename = String::from(old_fullfilename);
@@ -534,8 +535,11 @@ fn unpad(data: &[u8]) -> Vec<u8> {
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum MyError {
-    MagicHeaderError,
+pub enum NcmError {
+    NotNcmFile,
+    CannotReadFileName,
+    CannotReadMetaInfo,
+    CoverCannotSave,
     FileReadError,
     FileSkipError,
     FileWriteError,
@@ -543,14 +547,18 @@ pub enum MyError {
     FileNotFoundError,
 }
 
-impl std::error::Error for MyError {}
+impl std::error::Error for NcmError {}
 
-impl std::fmt::Display for MyError {
+impl std::fmt::Display for NcmError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::MagicHeaderError => write!(f, "文件不为NCM格式"),
-            Self::FileReadError => write!(f, "文件读取错误"),
-            Self::FileWriteError => write!(f, "文件写入错误"),
+            Self::NotNcmFile => write!(f, "该文件不为NCM格式"),
+            Self::CannotReadFileName => write!(f, "无法读取文件名称"),
+            Self::CannotReadMetaInfo => write!(f, "无法读取歌曲元信息"),
+            Self::CoverCannotSave => write!(f, "封面无法保存"),
+
+            Self::FileReadError => write!(f, "读取文件时发生错误"),
+            Self::FileWriteError => write!(f, "写入文件时错误"),
             Self::FullFilenameError => write!(f, "文件名不符合规范"),
             _ => write!(f, "未知错误"),
         }
